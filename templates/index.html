@@ -333,11 +333,12 @@
                 <span class="w-2 h-2 rounded-full relative" style="background: {{ smart_alert.color }};"></span>
                 {{ smart_alert.title }}
             </h4>
-            <button onclick="toggleToast()" class="text-slate-500 hover:text-white transition"><svg class="w-4 h-4"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button onclick="toggleToast()" class="text-slate-500 hover:text-white transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
                     </path>
-                </svg></button>
+                </svg>
+            </button>
         </div>
         <p class="text-[13px] text-slate-300 leading-relaxed font-medium">{{ smart_alert.msg }}</p>
     </div>
@@ -397,6 +398,33 @@
                     <button type="submit"
                         class="bg-slate-200 text-black hover:bg-white px-5 py-2.5 rounded-lg text-[11px] uppercase tracking-wider font-bold transition shadow-lg">Scan</button>
                 </form>
+
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleToast()"
+                        class="text-slate-500 hover:text-white transition relative hidden md:block">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9">
+                            </path>
+                        </svg>
+                        {% if predicted_risk in ['Poor', 'Unhealthy for Sensitive', 'Unhealthy', 'Very Unhealthy',
+                        'Severe', 'Hazardous'] %}
+                        <span class="absolute top-0 right-0 flex h-2.5 w-2.5"><span
+                                class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                                style="background-color: {{ smart_alert.color }};"></span><span
+                                class="relative inline-flex rounded-full h-2.5 w-2.5"
+                                style="background-color: {{ smart_alert.color }};"></span></span>
+                        {% endif %}
+                    </button>
+                    <a href="/reset" title="Logout / Reset Profile"
+                        class="text-slate-500 hover:text-red-400 transition hidden md:block ml-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                            </path>
+                        </svg>
+                    </a>
+                </div>
             </div>
         </header>
 
@@ -494,7 +522,6 @@
                 </div>
 
                 <div class="p-6 pt-4 flex-grow relative z-10 flex flex-col">
-
                     <div class="mb-8 border-b border-white/10 pb-5">
                         <span class="text-[10px] uppercase text-slate-500 font-bold tracking-[0.2em] block mb-1">1Hr
                             Threat Analysis</span>
