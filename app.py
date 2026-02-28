@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session, redirect, url_for
 import sqlite3
 import time
 from src.api_fetch import get_city_coordinates, get_live_data, get_city_from_coords
 from src.predict import predict_next_hour_risk 
 
 app = Flask(__name__)
+# --- CRITICAL FOR AUTO-LOGIN / SESSIONS ---
+app.secret_key = 'aeroiq_super_secret_key_2026'
 
 # --- ENTERPRISE SCALE: HIGH-SPEED RAM CACHING ---
 # This allows 50+ concurrent users to load the page instantly without API lag
@@ -15,7 +17,7 @@ def cached_get_live_data(lat, lon):
     key = f"data_{lat}_{lon}"
     now = time.time()
     if key in API_CACHE and (now - API_CACHE[key]['time']) < CACHE_TTL:
-        return API_CACHE[key]['data'] # Return instant RAM data
+        return API_CACHE[key]['data'] 
     
     data = get_live_data(lat, lon)
     if data: API_CACHE[key] = {'time': now, 'data': data}
@@ -61,7 +63,7 @@ def calculate_health_impact(aqi, predicted_risk, user_health):
 
 def generate_smart_alert(predicted_risk, primary_threat, user_health, user_name):
     if predicted_risk in ["Good", "Moderate"]:
-        return {"title": "Clear Skies Ahead", "msg": f"{user_name}, the upcoming hour looks perfectly safe for your health profile. Enjoy the outdoors!", "color": "#00ffcc"}
+        return {"title": "Clear Skies Ahead", "msg": f"{user_name}, the upcoming hour looks perfectly safe. Enjoy the outdoors!", "color": "#00ffcc"}
     
     if user_health == "Asthma" and primary_threat in ["PM2.5", "PM10", "NO2"]:
         msg = f"Attention {user_name}: In the next hour, {primary_threat} will surge. HIGH RISK of an asthma attack. Please stay indoors."
@@ -77,7 +79,8 @@ def generate_smart_alert(predicted_risk, primary_threat, user_health, user_name)
     else:
         return {"title": "🚨 CRITICAL HEALTH DANGER", "msg": msg, "color": "#ff0055"}
 
-# --- FIXED: FULLY PERSONALIZED ACTION PLAN (Even on Good Days) ---
+
+# --- FIXED: ACTION PLAN NOW CHANGES FOR EVERY CONDITION ---
 def generate_action_plan(predicted_risk, primary_threat, user_health):
     actions = []
     
@@ -148,33 +151,68 @@ def generate_comprehensive_guide(aqi, risk_text, city, user_health):
 
     return {"theme": {"bg": bg, "color": color, "level": level}, "tabs": tabs}
 
+
+# --- LOGOUT ROUTE ---
+@app.route("/reset")
+def reset_session():
+    session.clear()
+    return redirect(url_for('dashboard'))
+
+
 @app.route("/", methods=["GET", "POST"])
 def dashboard():
-    if request.method == "GET": return render_template("index.html", show_onboarding=True)
-
-    user_name = request.form.get("user_name", "Guest")
-    user_health = request.form.get("user_health")
-    if not user_health or user_health == "": user_health = "Normal"
-    
+    error_message = None
     lat, lon, official_city, country = None, None, None, None
 
-    # Exact GPS coordinates passed by the Profile Switcher
-    if "gps_lat" in request.form and request.form["gps_lat"] and request.form["gps_lat"] != "None":
-        try:
-            lat, lon = float(request.form["gps_lat"]), float(request.form["gps_lon"])
-            # Use cached reverse geocoding
-            official_city, country = get_city_from_coords(lat, lon)
-        except ValueError: pass
+    if request.method == "POST":
+        # Pull from form OR session
+        user_name = request.form.get("user_name") or session.get("user_name", "Guest")
+        user_health = request.form.get("user_health") or session.get("user_health", "Normal")
+        
+        # Exact GPS coordinates passed by the Profile Switcher
+        if request.form.get("gps_lat") and request.form.get("gps_lat") != "None":
+            try:
+                lat, lon = float(request.form["gps_lat"]), float(request.form["gps_lon"])
+                official_city, country = get_city_from_coords(lat, lon)
+            except ValueError: pass
 
-    # If new search
-    if not lat:
-        city_query = request.form.get("city_name")
-        if not city_query or city_query.strip() == "": city_query = request.form.get("current_city", "Delhi")
-        # Use cached coordinates
-        lat, lon, official_city, country = cached_get_city_coordinates(city_query)
+        # If new search
+        if not lat:
+            city_query = request.form.get("city_name")
+            if not city_query or city_query.strip() == "": 
+                city_query = request.form.get("current_city")
+            if city_query:
+                lat, lon, official_city, country = cached_get_city_coordinates(city_query)
+                if not lat:
+                    error_message = f"Location '{city_query}' is invalid. Please verify spelling."
 
-    if not lat: 
-        return render_template("index.html", show_onboarding=True, error_message=f"Location '{city_query}' is invalid. Please verify spelling.")
+        # If error occurred, fallback to previous session if it exists
+        if not lat:
+            if 'lat' in session:
+                lat, lon = session['lat'], session['lon']
+                official_city, country = session['city'], session['country']
+            else:
+                return render_template("index.html", show_onboarding=True, error_message=error_message)
+
+        # Save data to session (Browser Cookies)
+        session['user_name'] = user_name
+        session['user_health'] = user_health
+        session['lat'] = lat
+        session['lon'] = lon
+        session['city'] = official_city
+        session['country'] = country
+
+    else: 
+        # GET REQUEST: Auto-login if session exists
+        if 'lat' in session and 'user_name' in session:
+            user_name = session['user_name']
+            user_health = session['user_health']
+            lat = session['lat']
+            lon = session['lon']
+            official_city = session.get('city', 'Unknown')
+            country = session.get('country', 'Unknown')
+        else:
+            return render_template("index.html", show_onboarding=True)
 
     # Use High-Speed Cached Live Data
     live_data = cached_get_live_data(lat, lon)
@@ -208,8 +246,5 @@ def dashboard():
         health_guide=health_guide
     )
 
-import os
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(threaded=True, debug=True, port=5000)
