@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+notebooks/
+data/raw/
+data/processed/
+*.db
