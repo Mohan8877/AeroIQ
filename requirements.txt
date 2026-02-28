@@ -3,8 +3,8 @@ Werkzeug==3.0.1
 waitress==3.0.0
 requests==2.31.0
 urllib3==2.2.1
+random-forest==1.0.0
 scikit-learn==1.4.1.post1
 pandas==2.2.1
 numpy==1.26.4
 xgboost==2.0.3
-random-forest==1.0.0
